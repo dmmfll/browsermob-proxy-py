@@ -3,16 +3,16 @@ import platform
 import signal
 import socket
 import subprocess
+import sys
 import time
 
-import sys
+from psutil import Process, pid_exists
 
 from .client import Client
 from .exceptions import ProxyServerError
 
 
 class RemoteServer(object):
-
     def __init__(self, host, port):
         """
         Initialises a RemoteServer object
@@ -55,8 +55,7 @@ class RemoteServer(object):
 
 
 class Server(RemoteServer):
-
-    def __init__(self, path='browsermob-proxy', options=None):
+    def __init__(self, path="browsermob-proxy", options=None):
         """
         Initialises a Server object
 
@@ -69,32 +68,34 @@ class Server(RemoteServer):
 
         options = options if options is not None else {}
 
-        path_var_sep = ':'
-        if platform.system() == 'Windows':
-            path_var_sep = ';'
-            if not path.endswith('.bat'):
-                path += '.bat'
+        path_var_sep = ":"
+        if platform.system() == "Windows":
+            path_var_sep = ";"
+            if not path.endswith(".bat"):
+                path += ".bat"
 
         exec_not_on_path = True
-        for directory in os.environ['PATH'].split(path_var_sep):
-            if(os.path.isfile(os.path.join(directory, path))):
+        for directory in os.environ["PATH"].split(path_var_sep):
+            if os.path.isfile(os.path.join(directory, path)):
                 exec_not_on_path = False
                 break
 
         if not os.path.isfile(path) and exec_not_on_path:
-            raise ProxyServerError("Browsermob-Proxy binary couldn't be found "
-                                   "in path provided: %s" % path)
+            raise ProxyServerError(
+                "Browsermob-Proxy binary couldn't be found "
+                "in path provided: %s" % path
+            )
 
         self.path = path
-        self.host = options.get('host', 'localhost')
-        self.port = options.get('port', 8080)
+        self.host = options.get("host", "localhost")
+        self.port = options.get("port", 8080)
         self.process = None
 
-        if platform.system() == 'Darwin':
-            self.command = ['sh']
+        if platform.system() == "Darwin":
+            self.command = ["sh"]
         else:
             self.command = []
-        self.command += [path, '--port=%s' % self.port]
+        self.command += [path, "--port=%s" % self.port]
 
     def start(self, options=None):
         """
@@ -106,12 +107,12 @@ class Server(RemoteServer):
         """
         if options is None:
             options = {}
-        log_path = options.get('log_path', os.getcwd())
-        log_file = options.get('log_file', 'server.log')
-        retry_sleep = options.get('retry_sleep', 0.5)
-        retry_count = options.get('retry_count', 60)
+        log_path = options.get("log_path", os.getcwd())
+        log_file = options.get("log_file", "server.log")
+        retry_sleep = options.get("retry_sleep", 0.5)
+        retry_count = options.get("retry_count", 60)
         log_path_name = os.path.join(log_path, log_file)
-        self.log_file = open(log_path_name, 'w')
+        self.log_file = open(log_path_name, "w")
 
         if self.win_env:
             self.process = self._start_on_windows()
@@ -124,7 +125,8 @@ class Server(RemoteServer):
                 message = (
                     "The Browsermob-Proxy server process failed to start. "
                     "Check {0}"
-                    "for a helpful error message.".format(self.log_file))
+                    "for a helpful error message.".format(self.log_file)
+                )
 
                 raise ProxyServerError(message)
             time.sleep(retry_sleep)
@@ -134,16 +136,20 @@ class Server(RemoteServer):
                 raise ProxyServerError("Can't connect to Browsermob-Proxy")
 
     def _start_on_windows(self):
-        return subprocess.Popen(self.command,
-                                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-                                stdout=self.log_file,
-                                stderr=subprocess.STDOUT)
+        return subprocess.Popen(
+            self.command,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+            stdout=self.log_file,
+            stderr=subprocess.STDOUT,
+        )
 
     def _start_on_unix(self):
-        return subprocess.Popen(self.command,
-                                preexec_fn=os.setsid,
-                                stdout=self.log_file,
-                                stderr=subprocess.STDOUT)
+        return subprocess.Popen(
+            self.command,
+            preexec_fn=os.setsid,
+            stdout=self.log_file,
+            stderr=subprocess.STDOUT,
+        )
 
     def stop(self):
         """
@@ -152,11 +158,15 @@ class Server(RemoteServer):
         if self.process.poll() is not None:
             return
 
-        group_pid = os.getpgid(self.process.pid) if not self.win_env else self.process.pid
+        # Terminate java children on Unix-like platforms.
+        if self.win_env is False:
+            pid = self.process.pid
+            if pid_exists(pid) is True:
+                for child in Process(pid).children():
+                    child.terminate()
         try:
             self.process.kill()
             self.process.wait()
-            os.killpg(group_pid, signal.SIGINT)
         except AttributeError:
             # kill may not be available under windows environment
             pass
