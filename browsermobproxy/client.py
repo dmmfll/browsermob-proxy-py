@@ -1,9 +1,10 @@
 import requests
 
 try:
-    from urllib.parse import urlencode, unquote
+    from urllib.parse import unquote, urlencode
 except ImportError:
     from urllib import urlencode, unquote
+
 import json
 
 
@@ -25,17 +26,19 @@ class Client(object):
             urlparams = "?" + unquote(urlencode(params))
         else:
             urlparams = ""
-        if 'existing_proxy_port_to_use' in options:
-            self.port = options['existing_proxy_port_to_use']
+        if "existing_proxy_port_to_use" in options:
+            self.port = options["existing_proxy_port_to_use"]
         else:
-            resp = requests.post('%s/proxy' % self.host + urlparams)
-            content = resp.content.decode('utf-8')
+            resp = requests.post("%s/proxy" % self.host + urlparams)
+            content = resp.content.decode("utf-8")
             try:
                 jcontent = json.loads(content)
             except Exception as e:
-                raise Exception("Could not read Browsermob-Proxy json\n"
-                                "Another server running on this port?\n%s..." % content[:512])
-            self.port = jcontent['port']
+                raise Exception(
+                    "Could not read Browsermob-Proxy json\n"
+                    "Another server running on this port?\n%s..." % content[:512]
+                )
+            self.port = jcontent["port"]
         url_parts = self.host.split(":")
         self.proxy = url_parts[1][2:] + ":" + str(self.port)
 
@@ -43,7 +46,7 @@ class Client(object):
         """
         shuts down the proxy and closes the port
         """
-        r = requests.delete('%s/proxy/%s' % (self.host, self.port))
+        r = requests.delete("%s/proxy/%s" % (self.host, self.port))
         return r.status_code
 
     # webdriver integration
@@ -53,10 +56,13 @@ class Client(object):
         Returns a Selenium WebDriver Proxy class with details of the HTTP Proxy
         """
         from selenium import webdriver
-        return webdriver.Proxy({
-            "httpProxy": self.proxy,
-            "sslProxy": self.proxy,
-        })
+
+        return webdriver.Proxy(
+            {
+                "httpProxy": self.proxy,
+                "sslProxy": self.proxy,
+            }
+        )
 
     def webdriver_proxy(self):
         """
@@ -73,10 +79,10 @@ class Client(object):
 
         :param capabilities: The Desired capabilities object from Selenium WebDriver
         """
-        capabilities['proxy'] = {
-            'proxyType': "MANUAL",
-            'httpProxy': self.proxy,
-            'sslProxy': self.proxy
+        capabilities["proxy"] = {
+            "proxyType": "MANUAL",
+            "httpProxy": self.proxy,
+            "sslProxy": self.proxy,
         }
 
     def add_to_webdriver_capabilities(self, capabilities):
@@ -89,8 +95,8 @@ class Client(object):
         Return a list of proxy ports available
         """
         # r should look like {u'proxyList': [{u'port': 8081}]}
-        r = requests.get('%s/proxy' % self.host).json()
-        ports = [port['port'] for port in r['proxyList']]
+        r = requests.get("%s/proxy" % self.host).json()
+        ports = [port["port"] for port in r["proxyList"]]
 
         return ports
 
@@ -99,7 +105,7 @@ class Client(object):
         """
         Gets the HAR that has been recorded
         """
-        r = requests.get('%s/proxy/%s/har' % (self.host, self.port))
+        r = requests.get("%s/proxy/%s/har" % (self.host, self.port))
 
         return r.json()
 
@@ -120,12 +126,12 @@ class Client(object):
         options = options if options is not None else {}
         payload = {"initialPageRef": ref} if ref is not None else {}
         if title is not None:
-            payload.update({'initialPageTitle': title})
+            payload.update({"initialPageTitle": title})
 
         if options:
             payload.update(options)
 
-        r = requests.put('%s/proxy/%s/har' % (self.host, self.port), payload)
+        r = requests.put("%s/proxy/%s/har" % (self.host, self.port), payload)
         if r.status_code == 200:
             return (r.status_code, r.json())
         else:
@@ -140,9 +146,8 @@ class Client(object):
         """
         payload = {"pageRef": ref} if ref is not None else {}
         if title is not None:
-            payload.update({'pageTitle': title})
-        r = requests.put('%s/proxy/%s/har/pageRef' % (self.host, self.port),
-                         payload)
+            payload.update({"pageTitle": title})
+        r = requests.put("%s/proxy/%s/har/pageRef" % (self.host, self.port), payload)
         return r.status_code
 
     def blacklist(self, regexp, status_code):
@@ -153,8 +158,10 @@ class Client(object):
         :param int status_code: the HTTP status code to return for URLs
             that do not match the blacklist
         """
-        r = requests.put('%s/proxy/%s/blacklist' % (self.host, self.port),
-                         {'regex': regexp, 'status': status_code})
+        r = requests.put(
+            "%s/proxy/%s/blacklist" % (self.host, self.port),
+            {"regex": regexp, "status": status_code},
+        )
         return r.status_code
 
     def whitelist(self, regexp, status_code):
@@ -165,8 +172,10 @@ class Client(object):
         :param int status_code: the HTTP status code to return for URLs
             that do not match the whitelist
         """
-        r = requests.put('%s/proxy/%s/whitelist' % (self.host, self.port),
-                         {'regex': regexp, 'status': status_code})
+        r = requests.put(
+            "%s/proxy/%s/whitelist" % (self.host, self.port),
+            {"regex": regexp, "status": status_code},
+        )
         return r.status_code
 
     def basic_authentication(self, domain, username, password):
@@ -177,9 +186,11 @@ class Client(object):
         :param str username: valid username to use when authenticating
         :param  str password: valid password to use when authenticating
         """
-        r = requests.post(url='%s/proxy/%s/auth/basic/%s' % (self.host, self.port, domain),
-                          data=json.dumps({'username': username, 'password': password}),
-                          headers={'content-type': 'application/json'})
+        r = requests.post(
+            url="%s/proxy/%s/auth/basic/%s" % (self.host, self.port, domain),
+            data=json.dumps({"username": username, "password": password}),
+            headers={"content-type": "application/json"},
+        )
         return r.status_code
 
     def headers(self, headers):
@@ -191,9 +202,11 @@ class Client(object):
         if not isinstance(headers, dict):
             raise TypeError("headers needs to be dictionary")
 
-        r = requests.post(url='%s/proxy/%s/headers' % (self.host, self.port),
-                          data=json.dumps(headers),
-                          headers={'content-type': 'application/json'})
+        r = requests.post(
+            url="%s/proxy/%s/headers" % (self.host, self.port),
+            data=json.dumps(headers),
+            headers={"content-type": "application/json"},
+        )
         return r.status_code
 
     def response_interceptor(self, js):
@@ -205,9 +218,11 @@ class Client(object):
         are available objects to interact with.
         :param str js: the js/java code to execute
         """
-        r = requests.post(url='%s/proxy/%s/filter/response' % (self.host, self.port),
-                          data=js,
-                          headers={'content-type': 'text/plain'})
+        r = requests.post(
+            url="%s/proxy/%s/filter/response" % (self.host, self.port),
+            data=js,
+            headers={"content-type": "text/plain"},
+        )
         return r.status_code
 
     def request_interceptor(self, js):
@@ -219,15 +234,17 @@ class Client(object):
         are available objects to interact with.
         :param str js: the js/java code to execute
         """
-        r = requests.post(url='%s/proxy/%s/filter/request' % (self.host, self.port),
-                          data=js,
-                          headers={'content-type': 'text/plain'})
+        r = requests.post(
+            url="%s/proxy/%s/filter/request" % (self.host, self.port),
+            data=js,
+            headers={"content-type": "text/plain"},
+        )
         return r.status_code
 
     LIMITS = {
-        'upstream_kbps': 'upstreamKbps',
-        'downstream_kbps': 'downstreamKbps',
-        'latency': 'latency'
+        "upstream_kbps": "upstreamKbps",
+        "downstream_kbps": "downstreamKbps",
+        "latency": "latency",
     }
 
     def limits(self, options):
@@ -243,22 +260,21 @@ class Client(object):
 
         for (k, v) in list(options.items()):
             if k not in self.LIMITS:
-                raise KeyError('invalid key: %s' % k)
+                raise KeyError("invalid key: %s" % k)
 
             params[self.LIMITS[k]] = int(v)
 
         if len(list(params.items())) == 0:
             raise KeyError("You need to specify one of the valid Keys")
 
-        r = requests.put('%s/proxy/%s/limit' % (self.host, self.port),
-                         params)
+        r = requests.put("%s/proxy/%s/limit" % (self.host, self.port), params)
         return r.status_code
 
     TIMEOUTS = {
-        'request': 'requestTimeout',
-        'read': 'readTimeout',
-        'connection': 'connectionTimeout',
-        'dns': 'dnsCacheTimeout'
+        "request": "requestTimeout",
+        "read": "readTimeout",
+        "connection": "connectionTimeout",
+        "dns": "dnsCacheTimeout",
     }
 
     def timeouts(self, options):
@@ -275,15 +291,14 @@ class Client(object):
 
         for (k, v) in list(options.items()):
             if k not in self.TIMEOUTS:
-                raise KeyError('invalid key: %s' % k)
+                raise KeyError("invalid key: %s" % k)
 
             params[self.TIMEOUTS[k]] = int(v)
 
         if len(list(params.items())) == 0:
             raise KeyError("You need to specify one of the valid Keys")
 
-        r = requests.put('%s/proxy/%s/timeout' % (self.host, self.port),
-                         params)
+        r = requests.put("%s/proxy/%s/timeout" % (self.host, self.port), params)
         return r.status_code
 
     def remap_hosts(self, address=None, ip_address=None, hostmap=None):
@@ -296,12 +311,14 @@ class Client(object):
         :param **hostmap: Other hosts to be added as keyword arguments
         """
         hostmap = hostmap if hostmap is not None else {}
-        if (address is not None and ip_address is not None):
+        if address is not None and ip_address is not None:
             hostmap[address] = ip_address
 
-        r = requests.post('%s/proxy/%s/hosts' % (self.host, self.port),
-                          json.dumps(hostmap),
-                          headers={'content-type': 'application/json'})
+        r = requests.post(
+            "%s/proxy/%s/hosts" % (self.host, self.port),
+            json.dumps(hostmap),
+            headers={"content-type": "application/json"},
+        )
         return r.status_code
 
     def wait_for_traffic_to_stop(self, quiet_period, timeout):
@@ -312,15 +329,17 @@ class Client(object):
             to be quiet for
         :param int timeout: max number of milliseconds to wait
         """
-        r = requests.put('%s/proxy/%s/wait' % (self.host, self.port),
-                         {'quietPeriodInMs': quiet_period, 'timeoutInMs': timeout})
+        r = requests.put(
+            "%s/proxy/%s/wait" % (self.host, self.port),
+            {"quietPeriodInMs": quiet_period, "timeoutInMs": timeout},
+        )
         return r.status_code
 
     def clear_dns_cache(self):
         """
         Clears the DNS cache associated with the proxy instance
         """
-        r = requests.delete('%s/proxy/%s/dns/cache' % (self.host, self.port))
+        r = requests.delete("%s/proxy/%s/dns/cache" % (self.host, self.port))
         return r.status_code
 
     def rewrite_url(self, match, replace):
@@ -331,12 +350,8 @@ class Client(object):
         :param replace: unicode \
                    a string to replace the matches with
         """
-        params = {
-            "matchRegex": match,
-            "replace": replace
-        }
-        r = requests.put('%s/proxy/%s/rewrite' % (self.host, self.port),
-                         params)
+        params = {"matchRegex": match, "replace": replace}
+        r = requests.put("%s/proxy/%s/rewrite" % (self.host, self.port), params)
         return r.status_code
 
     def clear_all_rewrite_url_rules(self):
@@ -345,7 +360,7 @@ class Client(object):
         :return: status code
         """
 
-        r = requests.delete('%s/proxy/%s/rewrite' % (self.host, self.port))
+        r = requests.delete("%s/proxy/%s/rewrite" % (self.host, self.port))
         return r.status_code
 
     def retry(self, retry_count):
@@ -354,6 +369,7 @@ class Client(object):
 
         :param int retry_count: the number of retries
         """
-        r = requests.put('%s/proxy/%s/retry' % (self.host, self.port),
-                         {'retrycount': retry_count})
+        r = requests.put(
+            "%s/proxy/%s/retry" % (self.host, self.port), {"retrycount": retry_count}
+        )
         return r.status_code

@@ -1,14 +1,17 @@
 import os.path
-import pytest
 import sys
+
+import pytest
 
 
 def setup_module(module):
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 
 class TestClient(object):
     def setup_method(self, method):
         from browsermobproxy.client import Client
+
         self.client = Client("localhost:9090")
 
     def teardown_method(self, method):
@@ -16,28 +19,28 @@ class TestClient(object):
 
     def test_we_can_get_list_of_ports(self):
         """
-            GET /proxy - get a list of ports attached to ProxyServer instances
-                         managed by ProxyManager
+        GET /proxy - get a list of ports attached to ProxyServer instances
+                     managed by ProxyManager
         """
         ports = self.client.proxy_ports
 
-        assert(len(ports) == 1)
-        assert(9090 not in ports)
+        assert len(ports) >= 1
+        assert 9090 not in ports
 
     def test_headers_type(self):
         """
         /proxy/:port/headers needs to take a dictionary
         """
         with pytest.raises(TypeError):
-            self.client.headers(['foo'])
+            self.client.headers(["foo"])
 
     def test_headers_content(self):
         """
         /proxy/:port/headers needs to take a dictionary
         and returns 200 when its successful
         """
-        s = self.client.headers({'User-Agent': 'rubber ducks floating in a row'})
-        assert(s == 200)
+        s = self.client.headers({"User-Agent": "rubber ducks floating in a row"})
+        assert s == 200
 
     def test_new_har(self):
         """
@@ -46,11 +49,11 @@ class TestClient(object):
         and returns 200 and the previous har when creating one with the same name
         """
         status_code, har = self.client.new_har()
-        assert(status_code == 204)
-        assert(har is None)
+        assert status_code == 204
+        assert har is None
         status_code, har = self.client.new_har()
-        assert(status_code == 200)
-        assert('log' in har)
+        assert status_code == 200
+        assert "log" in har
 
     def _test_new_har(self):
         """
@@ -59,11 +62,11 @@ class TestClient(object):
         and returns 200 and the previous har when creating one with the same name
         """
         status_code, har = self.client.new_har("elephants")
-        assert(status_code == 204)
-        assert(har is None)
+        assert status_code == 204
+        assert har is None
         status_code, har = self.client.new_har("elephants")
-        assert(status_code == 200)
-        assert('elephants' == har["log"]["pages"][0]['id'])
+        assert status_code == 200
+        assert "elephants" == har["log"]["pages"][0]["id"]
 
     def test_new_page_defaults(self):
         """
@@ -73,8 +76,8 @@ class TestClient(object):
         self.client.new_har()
         self.client.new_page()
         har = self.client.har
-        assert(len(har["log"]["pages"]) == 2)
-        assert(har["log"]["pages"][1]["id"] == "Page 1")
+        assert len(har["log"]["pages"]) == 2
+        assert har["log"]["pages"][1]["id"] == "Page 1"
 
     def test_new_named_page(self):
         """
@@ -82,10 +85,10 @@ class TestClient(object):
         adds a new page of 'buttress'
         """
         self.client.new_har()
-        self.client.new_page('buttress')
+        self.client.new_page("buttress")
         har = self.client.har
-        assert(len(har["log"]["pages"]) == 2)
-        assert(har["log"]["pages"][1]["id"] == "buttress")
+        assert len(har["log"]["pages"]) == 2
+        assert har["log"]["pages"][1]["id"] == "buttress"
 
     def test_single_whitelist(self):
         """
@@ -93,15 +96,17 @@ class TestClient(object):
         adds a whitelist
         """
         status_code = self.client.whitelist("http://www\\.facebook\\.com/.*", 200)
-        assert(status_code == 200)
+        assert status_code == 200
 
     def test_multiple_whitelists(self):
         """
         /proxy/:port/whitelist
         adds a whitelist
         """
-        status_code = self.client.whitelist("http://www\\.facebook\\.com/.*,http://cdn\\.twitter\\.com", 200)
-        assert(status_code == 200)
+        status_code = self.client.whitelist(
+            "http://www\\.facebook\\.com/.*,http://cdn\\.twitter\\.com", 200
+        )
+        assert status_code == 200
 
     def test_blacklist(self):
         """
@@ -109,15 +114,17 @@ class TestClient(object):
         adds a blacklist
         """
         status_code = self.client.blacklist("http://www\\.facebook\\.com/.*", 200)
-        assert(status_code == 200)
+        assert status_code == 200
 
     def test_basic_authentication(self):
         """
         /proxy/:port/auth/basic
         adds automatic basic authentication
         """
-        status_code = self.client.basic_authentication("www.example.com", "myUsername", "myPassword")
-        assert(status_code == 200)
+        status_code = self.client.basic_authentication(
+            "www.example.com", "myUsername", "myPassword"
+        )
+        assert status_code == 200
 
     def test_limits_invalid_key(self):
         """
@@ -142,7 +149,7 @@ class TestClient(object):
         """
         limits = {"upstream_kbps": 320, "downstream_kbps": 560, "latency": 30}
         status_code = self.client.limits(limits)
-        assert(status_code == 200)
+        assert status_code == 200
 
     def test_rewrite(self):
         """
@@ -152,7 +159,7 @@ class TestClient(object):
         match = "/foo"
         replace = "/bar"
         status_code = self.client.rewrite_url(match, replace)
-        assert(status_code == 200)
+        assert status_code == 200
 
     def test_close(self):
         """
@@ -160,9 +167,9 @@ class TestClient(object):
         close the proxy port
         """
         status_code = self.client.close()
-        assert(status_code == 200)
+        assert status_code == 200
         status_code = self.client.close()
-        assert(status_code == 404)
+        assert status_code == 404
 
     def test_response_interceptor_with_parsing_js(self):
         """
@@ -172,7 +179,7 @@ class TestClient(object):
         """
         js = 'alert("foo")'
         status_code = self.client.response_interceptor(js)
-        assert(status_code == 200)
+        assert status_code == 200
 
     def test_response_interceptor_with_invalid_js(self):
         """
@@ -182,7 +189,7 @@ class TestClient(object):
         """
         js = 'alert("foo"'
         status_code = self.client.response_interceptor(js)
-        assert(status_code == 500)
+        assert status_code == 500
 
     def test_request_interceptor_with_parsing_js(self):
         """
@@ -192,7 +199,7 @@ class TestClient(object):
         """
         js = 'alert("foo")'
         status_code = self.client.request_interceptor(js)
-        assert(status_code == 200)
+        assert status_code == 200
 
     def test_request_interceptor_with_invalid_js(self):
         """
@@ -202,7 +209,7 @@ class TestClient(object):
         """
         js = 'alert("foo"'
         status_code = self.client.request_interceptor(js)
-        assert(status_code == 500)
+        assert status_code == 500
 
     def test_timeouts_invalid_timeouts(self):
         """
@@ -227,46 +234,48 @@ class TestClient(object):
         """
         timeouts = {"request": 2, "read": 2, "connection": 2, "dns": 3}
         status_code = self.client.timeouts(timeouts)
-        assert(status_code == 200)
+        assert status_code == 200
 
     def test_remap_hosts(self):
         """
         /proxy/:port/hosts
         """
         status_code = self.client.remap_hosts("example.com", "1.2.3.4")
-        assert(status_code == 200)
+        assert status_code == 200
 
     def test_remap_hosts_with_hostmap(self):
         """
         /proxy/:port/hosts
         """
         status_code = self.client.remap_hosts(hostmap={"example.com": "1.2.3.4"})
-        assert(status_code == 200)
+        assert status_code == 200
 
     def test_wait_for_traffic_to_stop(self):
         """
         /proxy/:port/wait
         """
         status_code = self.client.wait_for_traffic_to_stop(2000, 10000)
-        assert(status_code == 200)
+        assert status_code == 200
 
     def test_clear_dns_cache(self):
         """
         /proxy/:port/dns/cache
         """
         status_code = self.client.clear_dns_cache()
-        assert(status_code == 200)
+        assert status_code == 200
 
     def test_rewrite_url(self):
         """
         /proxy/:port/rewrite
         """
-        status_code = self.client.rewrite_url('http://www.facebook\.com', 'http://microsoft.com')
-        assert(status_code == 200)
+        status_code = self.client.rewrite_url(
+            "http://www.facebook\.com", "http://microsoft.com"
+        )
+        assert status_code == 200
 
     def test_retry(self):
         """
         /proxy/:port/retry
         """
         status_code = self.client.retry(4)
-        assert(status_code == 200)
+        assert status_code == 200
