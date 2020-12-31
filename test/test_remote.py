@@ -1,32 +1,39 @@
+import os
+import shutil
+import sys
 from os import environ
 
-from selenium import webdriver
-import selenium.webdriver.common.desired_capabilities
-import os
-import sys
 import pytest
+import selenium.webdriver.common.desired_capabilities
+from selenium import webdriver
+
+COMMAND_EXECUTOR = "http://172.17.0.1:4444/wd/hub"
 
 
 def setup_module(module):
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
 class TestRemote(object):
     def setup_method(self, method):
         from browsermobproxy.client import Client
+        from selenium.webdriver.common.proxy import Proxy, ProxyType
+        from selenium.webdriver.firefox.options import Options
+
+        firefox_binary = shutil.which("firefox")
+        if firefox_binary is None:
+            raise RuntimeError("No firefox executable found.")
         self.client = Client("localhost:9090")
-        chrome_binary = environ.get("CHROME_BIN", None)
-        self.desired_caps = selenium.webdriver.common.desired_capabilities.DesiredCapabilities.CHROME
-        if chrome_binary is not None:
-            self.desired_caps.update({
-                "chromeOptions": {
-                    "binary": chrome_binary,
-                    "args": ['no-sandbox']
-                }
-            })
+        options = Options()
+        options.binary_location = firefox_binary
+
+        proxy = Proxy()
+        proxy.proxy_type = ProxyType.MANUAL
+        proxy.http_proxy = self.client.proxy
+
         self.driver = webdriver.Remote(
-            desired_capabilities=self.desired_caps,
-            proxy=self.client)
+            command_executor=COMMAND_EXECUTOR, options=options
+        )
 
     def teardown_method(self, method):
         self.client.close()
@@ -36,7 +43,8 @@ class TestRemote(object):
     def test_set_clear_url_rewrite_rule(self):
         targetURL = "https://www.saucelabs.com/versions.js"
         assert 200 == self.client.rewrite_url(
-            "https://www.saucelabs.com/versions.+", "https://www.saucelabs.com/versions.json"
+            "https://www.saucelabs.com/versions.+",
+            "https://www.saucelabs.com/versions.json",
         )
         self.driver.get(targetURL)
         assert "Sauce Connect" in self.driver.page_source
@@ -49,7 +57,8 @@ class TestRemote(object):
         content = "Response successfully intercepted"
         targetURL = "https://saucelabs.com/versions.json?hello"
         self.client.response_interceptor(
-            """if(messageInfo.getOriginalUrl().contains('?hello')){contents.setTextContents("%s");}""" % content
+            """if(messageInfo.getOriginalUrl().contains('?hello')){contents.setTextContents("%s");}"""
+            % content
         )
         self.driver.get(targetURL)
         assert content in self.driver.page_source
