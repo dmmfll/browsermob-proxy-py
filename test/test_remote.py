@@ -1,26 +1,22 @@
 import os
+import re
 import shutil
 import sys
 from os import environ
 
 import pytest
 import selenium.webdriver.common.desired_capabilities
+from browsermobproxy.client import Client
 from selenium import webdriver
+from selenium.webdriver.common.proxy import Proxy, ProxyType
+from selenium.webdriver.firefox.firefox_profile import FirefoxProfile
+from selenium.webdriver.firefox.options import Options
 
 COMMAND_EXECUTOR = "http://172.17.0.1:4444/wd/hub"
 
 
-def setup_module(module):
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-
-class TestRemote(object):
-    def setup_method(self, method):
-        from browsermobproxy.client import Client
-        from selenium.webdriver.common.proxy import Proxy, ProxyType
-        from selenium.webdriver.firefox.firefox_profile import FirefoxProfile
-        from selenium.webdriver.firefox.options import Options
-
+class TestRemote:
+    def setup_class(self):
         firefox_binary = shutil.which("firefox")
         if firefox_binary is None:
             raise RuntimeError("No firefox executable found.")
@@ -37,6 +33,8 @@ class TestRemote(object):
         proxy.proxy_type = ProxyType.MANUAL
         proxy.http_proxy = self.client.proxy
 
+        # Allow proxying of localhost addresses.
+        # https://stackoverflow.com/a/57419409/1913726
         firefox_profile = FirefoxProfile()
         firefox_profile.set_preference("network.proxy.allow_hijacking_localhost", True)
 
@@ -46,41 +44,42 @@ class TestRemote(object):
             proxy=proxy,
             options=options,
         )
-
-    def teardown_method(self, method):
-        self.client.close()
-        self.driver.quit()
-
-    @pytest.mark.human
-    def test_set_clear_url_rewrite_rule(self):
-        import re
-
         targetURL = "http://localhost:8000/versions.js"
         pattern = r"http:\/\/localhost:8000\/versions\.[a-z]+$"
         pattern_ = re.compile(pattern)
         match = pattern_.match(targetURL)
         assert match.group() == targetURL
-        canonical_url = "http://localhost:8000/versions.json"
+        self.pattern = pattern
+        self.canonical_url = "http://localhost:8000/versions.json"
+        self.targetURL = targetURL
+
+    def teardown_class(self):
+        self.client.close()
+        self.driver.quit()
+
+    @pytest.mark.human
+    def test_set_clear_url_rewrite_rule(self):
+
         needle = "Makayla Thomas"
-        self.driver.get(canonical_url)
+        self.driver.get(self.canonical_url)
         assert needle in self.driver.page_source
 
-        response = self.client.rewrite_url(pattern, canonical_url)
+        response = self.client.rewrite_url(self.pattern, self.canonical_url)
         assert 200 == response
-        self.driver.get(targetURL)
+        self.driver.get(self.targetURL)
         assert needle in self.driver.page_source
 
         assert self.client.clear_all_rewrite_url_rules() == 200
-        self.driver.get(targetURL)
+        self.driver.get(self.targetURL)
         assert "needle" not in self.driver.page_source
 
     @pytest.mark.human
     def test_response_interceptor(self):
-        content = "Response successfully intercepted"
-        targetURL = "https://saucelabs.com/versions.json?hello"
+        content = "Response successfully intercepted."
+        self.targetURL = f"{self.canonical_url}?hello"
         self.client.response_interceptor(
             """if(messageInfo.getOriginalUrl().contains('?hello')){contents.setTextContents("%s");}"""
             % content
         )
-        self.driver.get(targetURL)
+        self.driver.get(self.targetURL)
         assert content in self.driver.page_source
