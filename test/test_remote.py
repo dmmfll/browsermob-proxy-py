@@ -32,7 +32,7 @@ class TestRemote(object):
         proxy.http_proxy = self.client.proxy
 
         self.driver = webdriver.Remote(
-            command_executor=COMMAND_EXECUTOR, options=options
+            command_executor=COMMAND_EXECUTOR, options=options, proxy=proxy
         )
 
     def teardown_method(self, method):
@@ -41,14 +41,23 @@ class TestRemote(object):
 
     @pytest.mark.human
     def test_set_clear_url_rewrite_rule(self):
+        import re
+
         targetURL = "http://localhost:8000/versions.js"
-        assert 200 == self.client.rewrite_url(
-            "http://localhost:8000/versions.+",
-            "https://localhost:8000/versions.json",
-        )
-        self.driver.get(targetURL)
+        pattern = r"http:\/\/localhost:8000\/versions\.[a-z]+$"
+        pattern_ = re.compile(pattern)
+        match = pattern_.match(targetURL)
+        assert match.group() == targetURL
+        canonical_url = "http://localhost:8000/versions.json"
         needle = "Makayla Thomas"
+        self.driver.get(canonical_url)
         assert needle in self.driver.page_source
+
+        response = self.client.rewrite_url(pattern, canonical_url)
+        assert 200 == response
+        self.driver.get(targetURL)
+        assert needle in self.driver.page_source
+
         assert self.client.clear_all_rewrite_url_rules() == 200
         self.driver.get(targetURL)
         assert "needle" not in self.driver.page_source
