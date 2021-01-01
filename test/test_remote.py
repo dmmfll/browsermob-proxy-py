@@ -54,18 +54,20 @@ class TestRemote(object):
             "000.html",
             *query__fragment,
         )
-        target_url = urlunsplit(tokens)
-        needle = "64796c38a7f54d5ab735cdadd575a9ca"
-        self.driver.get(target_url)
-        assert needle in self.driver.page_source
-        assert 200 == self.client.rewrite_url(
-            urlunsplit((scheme, netloc, "[a-z]+\.html", *query__fragment)),
-            target_url,
-        )
+        canonical_url = urlunsplit(tokens)
         random_word = "".join((choice(ascii_lowercase) for _ in range(randint(1, 10))))
-        self.driver.get(
-            urlunsplit((scheme, netloc, f"{random_word}.html", *query__fragment))
+        target_url = urlunsplit(
+            (scheme, netloc, f"{random_word}.html", *query__fragment)
         )
+        needle = "64796c38a7f54d5ab735cdadd575a9ca"
+        self.driver.get(canonical_url)
+        assert needle in self.driver.page_source
+
+        assert 200 == self.client.rewrite_url(
+            r"[a-z]+\.html$",
+            path,
+        )
+        self.driver.get(target_url)
         assert needle in self.driver.page_source
         assert self.client.clear_all_rewrite_url_rules() == 200
         self.driver.get(rewrite_url)
