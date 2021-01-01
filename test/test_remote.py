@@ -3,6 +3,8 @@ import re
 import shutil
 import sys
 from os import environ
+from random import choice, randint
+from string import ascii_lowercase
 
 import pytest
 import selenium.webdriver.common.desired_capabilities
@@ -14,17 +16,18 @@ from selenium.webdriver.firefox.options import Options
 
 COMMAND_EXECUTOR = "http://172.17.0.1:4444/wd/hub"
 
+firefox_binary = shutil.which("firefox")
+if firefox_binary is None:
+    raise RuntimeError("No firefox executable found.")
+
 
 class TestRemote:
     def setup_class(self):
-        firefox_binary = shutil.which("firefox")
-        if firefox_binary is None:
-            raise RuntimeError("No firefox executable found.")
 
         self.client = Client("localhost:9090")
+
         options = Options()
         options.binary_location = firefox_binary
-        options.add_argument("network.proxy.allow_hijacking_localhost=true")
 
         # Include proxy values manually.
         # The selenium_proxy method returns values for sslProxy which
@@ -38,13 +41,17 @@ class TestRemote:
         firefox_profile = FirefoxProfile()
         firefox_profile.set_preference("network.proxy.allow_hijacking_localhost", True)
 
-        self.driver = webdriver.Remote(
+        remote_kwargs = dict(
             command_executor=COMMAND_EXECUTOR,
             browser_profile=firefox_profile,
             proxy=proxy,
             options=options,
         )
-        targetURL = "http://localhost:8000/versions.js"
+        self.driver = webdriver.Remote(**remote_kwargs)
+
+        random_word = "".join(choice(ascii_lowercase) for _ in range(randint(1, 10)))
+        targetURL = f"http://localhost:8000/versions.{random_word}"
+
         pattern = r"http:\/\/localhost:8000\/versions\.[a-z]+$"
         pattern_ = re.compile(pattern)
         match = pattern_.match(targetURL)
