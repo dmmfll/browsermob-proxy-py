@@ -2,6 +2,9 @@ import os
 import shutil
 import sys
 from os import environ
+from random import choice, randint
+from string import ascii_lowercase
+from urllib.parse import urlunsplit
 
 import pytest
 import selenium.webdriver.common.desired_capabilities
@@ -32,7 +35,7 @@ class TestRemote(object):
         proxy.http_proxy = self.client.proxy
 
         self.driver = webdriver.Remote(
-            command_executor=COMMAND_EXECUTOR, options=options
+            command_executor=COMMAND_EXECUTOR, options=options, proxy=proxy
         )
 
     def teardown_method(self, method):
@@ -41,24 +44,40 @@ class TestRemote(object):
 
     @pytest.mark.human
     def test_set_clear_url_rewrite_rule(self):
-        targetURL = "https://www.saucelabs.com/versions.js"
-        assert 200 == self.client.rewrite_url(
-            "https://www.saucelabs.com/versions.+",
-            "https://www.saucelabs.com/versions.json",
+        """Assume HTTP server running on localhost with a document
+        named 000.html"""
+
+        query__fragment = ("",) * 2
+        tokens = scheme, netloc, path, query, fragment = (
+            "http",
+            "localhost:8000",
+            "000.html",
+            *query__fragment,
         )
-        self.driver.get(targetURL)
-        assert "Sauce Connect" in self.driver.page_source
+        target_url = urlunsplit(tokens)
+        needle = "64796c38a7f54d5ab735cdadd575a9ca"
+        self.driver.get(target_url)
+        assert needle in self.driver.page_source
+        assert 200 == self.client.rewrite_url(
+            urlunsplit((scheme, netloc, "[a-z]+\.html", *query__fragment)),
+            target_url,
+        )
+        random_word = "".join((choice(ascii_lowercase) for _ in range(randint(1, 10))))
+        self.driver.get(
+            urlunsplit((scheme, netloc, f"{random_word}.html", *query__fragment))
+        )
+        assert needle in self.driver.page_source
         assert self.client.clear_all_rewrite_url_rules() == 200
-        self.driver.get(targetURL)
-        assert "Sauce Connect" not in self.driver.page_source
+        self.driver.get(rewrite_url)
+        assert needle not in self.driver.page_source
 
     @pytest.mark.human
     def test_response_interceptor(self):
         content = "Response successfully intercepted"
-        targetURL = "https://saucelabs.com/versions.json?hello"
+        target_url = "https://saucelabs.com/versions.json?hello"
         self.client.response_interceptor(
             """if(messageInfo.getOriginalUrl().contains('?hello')){contents.setTextContents("%s");}"""
             % content
         )
-        self.driver.get(targetURL)
+        self.driver.get(target_url)
         assert content in self.driver.page_source
