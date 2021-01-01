@@ -18,21 +18,33 @@ class TestRemote(object):
     def setup_method(self, method):
         from browsermobproxy.client import Client
         from selenium.webdriver.common.proxy import Proxy, ProxyType
+        from selenium.webdriver.firefox.firefox_profile import FirefoxProfile
         from selenium.webdriver.firefox.options import Options
 
         firefox_binary = shutil.which("firefox")
         if firefox_binary is None:
             raise RuntimeError("No firefox executable found.")
+
         self.client = Client("localhost:9090")
         options = Options()
         options.binary_location = firefox_binary
+        options.add_argument("network.proxy.allow_hijacking_localhost=true")
 
+        # Include proxy values manually.
+        # The selenium_proxy method returns values for sslProxy which
+        # fail in Firefox.
         proxy = Proxy()
         proxy.proxy_type = ProxyType.MANUAL
         proxy.http_proxy = self.client.proxy
 
+        firefox_profile = FirefoxProfile()
+        firefox_profile.set_preference("network.proxy.allow_hijacking_localhost", True)
+
         self.driver = webdriver.Remote(
-            command_executor=COMMAND_EXECUTOR, options=options, proxy=proxy
+            command_executor=COMMAND_EXECUTOR,
+            browser_profile=firefox_profile,
+            proxy=proxy,
+            options=options,
         )
 
     def teardown_method(self, method):
